@@ -1,5 +1,5 @@
 # Control Software for Chimera
-This is the software compatible with Anaero Technology's chimera gas sensor.
+This is the software compatible with Anaero Technology's Chimera gas sensor.
 The software here is designed to run on the ESP32s2 within the chimera itself and allows for communication with a computer using a USB-C cable and the software found here: https://github.com/Anaero-Technology/Chimera-Python-Controller
 
 ## How to use this
@@ -15,4 +15,4 @@ Under 'Tools' and 'Board' select 'ESP32s2 Dev Module' which should be under 'ESP
 Finally under 'Tools' make sure that 'USB CDC on Boot' is enabled.
 Then press the upload button (or ctrl+u) and wait for the code to be transferred. It is normal to receive an error at the end which says 'no_reset'.
 
-Then unplug the device fully to allow it to restart, then attempt to connect with the python interface.
+Then unplug the device fully to allow it to restart, then attempt to connect with the Python interface.
