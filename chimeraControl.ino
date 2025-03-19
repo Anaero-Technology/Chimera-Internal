@@ -921,7 +921,7 @@ void processMessage() {
       Serial.print(previousCh4Percent[i]);
       Serial.print(" ");
       //If it is not the last
-      if(i < 14){
+      if(i < 15){
         //Send carbon dioxide
         Serial.print(previousCo2Percent[i]);
         Serial.print(" ");
