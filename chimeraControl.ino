@@ -916,7 +916,7 @@ void processMessage() {
     //Send each of the stored data points
     Serial.print("pastdata ");
     //Iterate points
-    for(int i = 0; i < 15; i++){
+    for(int i = 0; i < 16; i++){
       //Send methane
       Serial.print(previousCh4Percent[i]);
       Serial.print(" ");
@@ -1491,11 +1491,10 @@ void writeData() {
     extraFile.println(co2Max);
     extraFile.close();
     Serial.write("All file writes done\n");
-
-    //Store integer versions for retrieval later
-    previousCh4Percent[currentValve] = floor(actualCh4);
-    previousCo2Percent[currentValve] = floor(actualCo2);
   }
+  //Store integer versions for retrieval later
+  previousCh4Percent[currentValve] = floor(actualCh4);
+  previousCo2Percent[currentValve] = floor(actualCo2);
 }
 
 int firstValve() {
