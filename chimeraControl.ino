@@ -146,8 +146,8 @@ int timeParts[6];
 bool setupCorrectly = false;
 
 //Arrays to hold most recent percentage for each reactor - for use by interface to recall last data
-int previousCh4Percent[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int previousCo2Percent[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int previousCh4Percent[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int previousCo2Percent[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 int valveOpen = -1;
 
@@ -1633,7 +1633,7 @@ void updateValves() {
       lastAction = millis();
       //Move to the pre valve open state
       currentState = 0;
-    }else{
+    } else {
       readValues();
     }
   }
