@@ -1459,7 +1459,7 @@ void writeData() {
   //Open the extra file to store the peak values
   File extraFile = SD.open(extraOutputFileName, FILE_WRITE);
   //Move to the end of the file
-  currentFile.seek(currentFile.size());
+  extraFile.seek(extraFile.size());
   //Write the time, valve and each of the peak values
   extraFile.print(timeStamp);
   extraFile.print(',');
