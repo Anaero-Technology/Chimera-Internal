@@ -1419,41 +1419,47 @@ void writeData() {
 
   //Calculate attempt at subtract and multiply normalisation
   double subtractModifier = ((actualCh4 + actualCo2) - 100) / 2.0;
-
-  //Get the current time
-  getTime();
-  //Open the current store file
-  File currentFile = SD.open(outputFileName, FILE_WRITE);
-  //Move to the end of the file
-  currentFile.seek(currentFile.size());
-  //Add the time, valve number, maximum CH4, maximum CO2, percentage CH4, percentage CO2 and normalised versions
-  currentFile.print(timeStamp);
-  currentFile.print(',');
-  currentFile.print(currentValve + 1);
-  currentFile.print(',');
-  currentFile.print(ch4Max);
-  currentFile.print(',');
-  currentFile.print(co2Max);
-  currentFile.print(',');
-  currentFile.print(actualCh4);
-  currentFile.print(',');
-  currentFile.print(actualCo2);
-  currentFile.print(',');
-  currentFile.print(actualCh4 - subtractModifier);
-  currentFile.print(',');
-  currentFile.println(actualCo2 - subtractModifier);
-  currentFile.close();
+  //If not flushing
+  if(currentState != 3){
+    //Get the current time
+    getTime();
+    //Open the current store file
+    File currentFile = SD.open(outputFileName, FILE_WRITE);
+    //Move to the end of the file
+    currentFile.seek(currentFile.size());
+    //Add the time, valve number, maximum CH4, maximum CO2, percentage CH4, percentage CO2 and normalised versions
+    currentFile.print(timeStamp);
+    currentFile.print(',');
+    currentFile.print(currentValve + 1);
+    currentFile.print(',');
+    currentFile.print(ch4Max);
+    currentFile.print(',');
+    currentFile.print(co2Max);
+    currentFile.print(',');
+    currentFile.print(actualCh4);
+    currentFile.print(',');
+    currentFile.println(actualCo2);
+    //currentFile.print(',');
+    //currentFile.print(actualCh4 - subtractModifier);
+    //currentFile.print(',');
+    //currentFile.println(actualCo2 - subtractModifier);
+    currentFile.close();
+  }
   //Send the valve, maximums and A to D values via serial followed by the peak values
   USBSerial.print("dataPoint ");
-  USBSerial.print(currentValve);
-  USBSerial.print(' ');
-  USBSerial.print(ch4Max);
-  USBSerial.print(' ');
-  USBSerial.print(co2Max);
-  USBSerial.print(' ');
-  USBSerial.print(actualCh4);
-  USBSerial.print(' ');
-  USBSerial.print(actualCo2);
+  if (currentState != 3){
+    USBSerial.print(currentValve);
+  }else{
+    USBSerial.print("15");
+  }
+  Serial.print(' ');
+  Serial.print(ch4Max);
+  Serial.print(' ');
+  Serial.print(co2Max);
+  Serial.print(' ');
+  Serial.print(actualCh4);
+  Serial.print(' ');
+  Serial.print(actualCo2);
   for (int i = 0; i < 5; i++) {
     USBSerial.print(' ');
     USBSerial.print(ch4ValuesPeak[i]);
@@ -1464,38 +1470,40 @@ void writeData() {
   }
   USBSerial.print('\n');
 
-  //Open the extra file to store the peak values
-  File extraFile = SD.open(extraOutputFileName, FILE_WRITE);
-  //Move to the end of the file
-  extraFile.seek(extraFile.size());
-  //Write the time, valve and each of the peak values
-  extraFile.print(timeStamp);
-  extraFile.print(',');
-  extraFile.print(currentValve + 1);
-  extraFile.print(",ch4");
-  for (int i = 0; i < 5; i++) {
+  if (currentState != 3){
+    //Open the extra file to store the peak values
+    File extraFile = SD.open(extraOutputFileName, FILE_WRITE);
+    //Move to the end of the file
+    extraFile.seek(extraFile.size());
+    //Write the time, valve and each of the peak values
+    extraFile.print(timeStamp);
     extraFile.print(',');
-    extraFile.print(ch4ValuesPeak[i]);
-  }
-  extraFile.print(",");
-  extraFile.println(ch4Max);
-  //Write the time, valve and each of the peak values
-  extraFile.print(timeStamp);
-  extraFile.print(',');
-  extraFile.print(currentValve + 1);
-  extraFile.print(",co2");
-  for (int i = 0; i < 5; i++) {
+    extraFile.print(currentValve + 1);
+    extraFile.print(",ch4");
+    for (int i = 0; i < 5; i++) {
+      extraFile.print(',');
+      extraFile.print(ch4ValuesPeak[i]);
+    }
+    extraFile.print(",");
+    extraFile.println(ch4Max);
+    //Write the time, valve and each of the peak values
+    extraFile.print(timeStamp);
     extraFile.print(',');
-    extraFile.print(co2ValuesPeak[i]);
-  }
-  extraFile.print(",");
-  extraFile.println(co2Max);
-  extraFile.close();
-  USBSerial.write("All file writes done\n");
+    extraFile.print(currentValve + 1);
+    extraFile.print(",co2");
+    for (int i = 0; i < 5; i++) {
+      extraFile.print(',');
+      extraFile.print(co2ValuesPeak[i]);
+    }
+    extraFile.print(",");
+    extraFile.println(co2Max);
+    extraFile.close();
+    Serial.write("All file writes done\n");
 
-  //Store integer versions for retrieval later
-  previousCh4Percent[currentValve] = floor(actualCh4);
-  previousCo2Percent[currentValve] = floor(actualCo2);
+    //Store integer versions for retrieval later
+    previousCh4Percent[currentValve] = floor(actualCh4);
+    previousCo2Percent[currentValve] = floor(actualCo2);
+  }
 }
 
 int firstValve() {
@@ -1619,10 +1627,14 @@ void updateValves() {
     if (timeDifference >= flushDuration) {
       //Close Flush
       closeValve(flushValve);
+      writeData();
+      resetValues();
       //Store the time of the last action
       lastAction = millis();
       //Move to the pre valve open state
       currentState = 0;
+    }else{
+      readValues();
     }
   }
 }
