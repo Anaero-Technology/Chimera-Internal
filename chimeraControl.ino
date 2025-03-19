@@ -872,15 +872,15 @@ void processMessage() {
   //If it is a request for the current valve timings
   else if (strcmp(msgParts[0], "timingget") == 0) {
     //If in calibration mode
-    if (calibrating) {
+    //if (calibrating) {
       //Send the valve timings
-      Serial.print("timing ");
-      Serial.print(openDuration);
-      Serial.print(" ");
-      Serial.println(flushDuration);
-    } else {
-      Serial.write("failed timingget notcalibrating\n");
-    }
+    Serial.print("timing ");
+    Serial.print(openDuration);
+    Serial.print(" ");
+    Serial.println(flushDuration);
+    //} else {
+      //Serial.write("failed timingget notcalibrating\n");
+    //}
   }
   //If it is a request for the in service state
   else if (strcmp(msgParts[0], "serviceget") == 0) {
