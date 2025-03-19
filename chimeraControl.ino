@@ -929,7 +929,7 @@ void processMessage() {
       USBSerial.print(previousCh4Percent[i]);
       USBSerial.print(" ");
       //If it is not the last
-      if(i < 14){
+      if(i < 15){
         //Send carbon dioxide
         USBSerial.print(previousCo2Percent[i]);
         USBSerial.print(" ");
