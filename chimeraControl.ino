@@ -604,7 +604,14 @@ void processMessage() {
     } else {
       USBSerial.write("false ");
     }
-    USBSerial.println(valveOpen);
+    USBSerial.print(valveOpen);
+    USBSerial.write(" ");
+    if(!calibrating){
+      USBSerial.print(timeDifference);
+    }else{
+      USBSerial.write("0");
+    }
+    USBSerial.write('\n');
   }
   //If it is a request for the file names, send the list of names
   else if (strcmp(msgParts[0], "files") == 0) {
