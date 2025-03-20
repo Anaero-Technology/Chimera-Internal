@@ -596,7 +596,14 @@ void processMessage() {
     } else {
       Serial.write("false ");
     }
-    Serial.println(valveOpen);
+    Serial.print(valveOpen);
+    Serial.write(" ");
+    if(!calibrating){
+      Serial.print(timeDifference);
+    }else{
+      Serial.write("0");
+    }
+    Serial.write('\n');
   }
   //If it is a request for the file names, send the list of names
   else if (strcmp(msgParts[0], "files") == 0) {
