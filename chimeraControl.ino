@@ -1424,11 +1424,11 @@ void writeData() {
   double actualCh4 = 0.0;
   double actualCo2 = 0.0;
   //Convert peak values to percentages using current calibration
-  actualCh4 = ch4Calibration[0] + (ch4Calibration[1] * ch4Max) + (ch4Calibration[2] * ch4Max * ch4Max) + (ch4Calibration[3] * ch4Max * ch4Max * ch4Max);
-  actualCo2 = co2Calibration[0] + (co2Calibration[1] * co2Max) + (co2Calibration[2] * co2Max * co2Max) + (co2Calibration[3] * co2Max * co2Max * co2Max);
+  actualCh4 = ch4Calibration[0] + (ch4Calibration[1] * (double)ch4Max) + (ch4Calibration[2] * (double)ch4Max * (double)ch4Max) + (ch4Calibration[3] * (double)ch4Max * (double)ch4Max * (double)ch4Max);
+  actualCo2 = co2Calibration[0] + (co2Calibration[1] * (double)co2Max) + (co2Calibration[2] * (double)co2Max * (double)co2Max) + (co2Calibration[3] * (double)co2Max * (double)co2Max * (double)co2Max);
 
   //Calculate attempt at subtract and multiply normalisation
-  double subtractModifier = ((actualCh4 + actualCo2) - 100) / 2.0;
+  //double subtractModifier = ((actualCh4 + actualCo2) - 100) / 2.0;
   //If not flushing
   if(currentState != 3){
     //Get the current time
