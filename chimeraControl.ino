@@ -938,6 +938,9 @@ void processMessage() {
       }
     }
   }
+  else if (strcmp(msgParts[0], "getcal") == 0){
+    outputCalibration();
+  }
 }
 
 void setRTCTime(int y, int m, int d, int h, int mi, int s) {
