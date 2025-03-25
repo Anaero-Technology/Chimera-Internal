@@ -1397,24 +1397,49 @@ void calculateValues() {
     currentValueIndex = currentValueIndex + 1;
   }
 
-  //If a new peak methane has been found
-  if (ch4Result > ch4Max) {
-    //Store the new maximum value
-    ch4Max = ch4Result;
-    //Iterate through peak length
-    for (int i = 0; i < 5; i++) {
-      //Store current values in peak
-      ch4ValuesPeak[i] = ch4Values[i];
+  //If this is a normal channel
+  if (currentState != 3){
+    //If a new peak methane has been found
+    if (ch4Result > ch4Max) {
+      //Store the new maximum value
+      ch4Max = ch4Result;
+      //Iterate through peak length
+      for (int i = 0; i < 5; i++) {
+        //Store current values in peak
+        ch4ValuesPeak[i] = ch4Values[i];
+      }
     }
-  }
-  //If a new peak carbon dioxide has been found
-  if (co2Result > co2Max) {
-    //Store the new maximum value
-    co2Max = co2Result;
-    //Iterate through peak length
-    for (int i = 0; i < 5; i++) {
-      //Store current values in peak
-      co2ValuesPeak[i] = co2Values[i];
+    //If a new peak carbon dioxide has been found
+    if (co2Result > co2Max) {
+      //Store the new maximum value
+      co2Max = co2Result;
+      //Iterate through peak length
+      for (int i = 0; i < 5; i++) {
+        //Store current values in peak
+        co2ValuesPeak[i] = co2Values[i];
+      }
+    }
+  //If this is a flushing channel
+  }else{
+    //If a new minimum methane has been found
+    if (ch4Result < ch4Max) {
+      //Store the new maximum value
+      ch4Max = ch4Result;
+      //Iterate through peak length
+      for (int i = 0; i < 5; i++) {
+        //Store current values in peak
+        ch4ValuesPeak[i] = ch4Values[i];
+      }
+    }
+    //If a new minimum carbon dioxide has been found
+    if (co2Result < co2Max) {
+      //Store the new maximum value
+      co2Max = co2Result;
+      //Iterate through peak length
+      for (int i = 0; i < 5; i++) {
+        //Store current values in peak
+        co2ValuesPeak[i] = co2Values[i];
+      }
     }
   }
 }
