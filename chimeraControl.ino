@@ -8,6 +8,8 @@ Changes this version:
 #include "RTClib.h"
 #include <Wire.h>
 #include <ESP32AnalogRead.h>
+#include "USB.h"        
+#include "USBCDC.h"     
 
 const int averageCount = 16;
 
@@ -134,6 +136,9 @@ const int outputFilePos = 16;
 //Create the real time clock
 RTC_DS3231 rtc;
 
+// Create an USB Serial port
+USBCDC USBSerial;               // Create Object @@@@ USB_Update Branch
+
 //Arrays to store the time as text and numbers
 char timeStamp[19];
 int timeParts[6];
@@ -153,27 +158,30 @@ void setup() {
   //analogSetAttenuation(ADC_6db);
   //Start a serial connection (used for usb port)
   Serial.begin(115200);
+  USBSerial.begin();              // Start USB serial Communication
+  USB.begin();                    // Start USB Native Port
   delay(2000);
   Serial.write("Starting\n");
   Wire.begin(2, 3);
   //Start the real time clock
   if (!rtc.begin()) {
-    Serial.write("RTC failed to start.\n");
+    //Serial.write("RTC failed to start.\n");
+    USBSerial.write("RTC failed to start.\n");  // Send the messages by USB too (Or replace the serial)
   } else {
     //Start the SPI bus
     SPI.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
     //Try and connect to the SD card
     if (!SD.begin(SD_CS)) {
-      Serial.write("Error, could not find SD card.\n");
+      USBSerial.write("Error, could not find SD card.\n");
     } else {
-      Serial.write("SD card connected\n");
+      USBSerial.write("SD card connected\n");
       //Check if the data file folder exists and create it if not
       if (!SD.exists("/files")) {
-        Serial.write("Creating Folder.\n");
+        USBSerial.write("Creating Folder.\n");
         SD.mkdir("/files");
-        Serial.write("Folder Created.\n");
+        USBSerial.write("Folder Created.\n");
       } else {
-        Serial.write("Folder already exists.\n");
+        USBSerial.write("Folder already exists.\n");
       }
       //Setup completed successfully
       setupCorrectly = true;
@@ -203,29 +211,29 @@ void setup() {
     digitalWrite(solenoidValvePins[i], LOW);
   }
 
-  Serial.write("Starting calibration.\n");
+  USBSerial.write("Starting calibration.\n");
   //Read calibration values if possible
   readCalibration();
   if (calibrated) {
-    Serial.write("Calibrated Successfully.\n");
+    USBSerial.write("Calibrated Successfully.\n");
   } else {
-    Serial.write("Calibration read failed.\n");
+    USBSerial.write("Calibration read failed.\n");
   }
   //Output the read calibration values
-  Serial.write("Methane:\n");
+  USBSerial.write("Methane:\n");
   for (int i = 0; i < 4; i++) {
-    Serial.println(ch4Calibration[i], 6);
+    USBSerial.println(ch4Calibration[i], 6);
   }
-  Serial.write("\nCarbon Dioxide:\n");
+  USBSerial.write("\nCarbon Dioxide:\n");
   for (int i = 0; i < 4; i++) {
-    Serial.println(co2Calibration[i], 6);
+    USBSerial.println(co2Calibration[i], 6);
   }
 
   //Read the timing and in service files
   readTiming();
-  Serial.write("Timings read\n");
+  USBSerial.write("Timings read\n");
   readInService();
-  Serial.write("In Service read\n");
+  USBSerial.write("In Service read\n");
 
   //Setup the arrays for averaging values
   for (int i = 0; i < averageCount; i++) {
@@ -244,7 +252,7 @@ void setup() {
     }
   }
   if (setupCorrectly) {
-    Serial.write("Setup Correctly\n");
+    USBSerial.write("Setup Correctly\n");
   }
 }
 
@@ -341,11 +349,11 @@ void getMemoryData() {
     int length2 = sprintf(usedBuff, "%.0f", usedBytes);
 
     //Send message
-    Serial.write("memory ");
-    Serial.write(totalBuff);
-    Serial.write(" ");
-    Serial.write(usedBuff);
-    Serial.write("\n");
+    USBSerial.write("memory ");
+    USBSerial.write(totalBuff);
+    USBSerial.write(" ");
+    USBSerial.write(usedBuff);
+    USBSerial.write("\n");
   }
 }
 
@@ -354,7 +362,7 @@ void listFiles() {
   if (setupCorrectly) {
     getMemoryData();
     char sizeBuff[33];
-    Serial.write("file start\n");
+    USBSerial.write("file start\n");
     //Open the root directory
     File root = SD.open("/files");
     //Open the first file
@@ -367,11 +375,11 @@ void listFiles() {
         //Send the message to give the file name
         char fileName[33];
         strcpy(fileName, currentFile.name());
-        Serial.write("file ");
-        Serial.write(fileName);
-        Serial.write(" ");
-        Serial.write(sizeBuff);
-        Serial.write("\n");
+        USBSerial.write("file ");
+        USBSerial.write(fileName);
+        USBSerial.write(" ");
+        USBSerial.write(sizeBuff);
+        USBSerial.write("\n");
       }
       //Open the next file
       currentFile = root.openNextFile();
@@ -380,7 +388,7 @@ void listFiles() {
     root.close();
   }
   //Send signal to indicate that it has finished (whether it was able to send files or not)
-  Serial.write("done files\n");
+  USBSerial.write("done files\n");
 }
 
 void downloadFile() {
@@ -401,18 +409,18 @@ void downloadFile() {
     char charNumberBuffer[33];
     itoa(charNumber, charNumberBuffer, 10);
     //Send message to indicate that the file is about to be transferred, with the file name
-    Serial.write("download start ");
-    Serial.write(fileToDownload);
-    Serial.write(" ");
-    Serial.write(charNumberBuffer);
-    Serial.write("\n");
+    USBSerial.write("download start ");
+    USBSerial.write(fileToDownload);
+    USBSerial.write(" ");
+    USBSerial.write(charNumberBuffer);
+    USBSerial.write("\n");
 
     uint32_t lastTime = getSecondsSince();
     bool terminated = false;
     //If there is data to send
     if (charNumber > 0) {
       //keyword to indicate a line is being sent
-      Serial.write("download ");
+      USBSerial.write("download ");
     }
     //Iterate through each character index
     for (int cha = 0; cha < charNumber && !terminated; cha = cha + 1) {
@@ -420,7 +428,7 @@ void downloadFile() {
       char nextChar = fileToSend.read();
       char next[2] = { nextChar, '\0' };
       //Write the character
-      Serial.write(next);
+      USBSerial.write(next);
       //If this is the end of a line
       if (nextChar == '\n' && cha != charNumber - 1) {
         //Message received to indicate that it is ready for the next item
@@ -439,10 +447,10 @@ void downloadFile() {
           }
 
           //While there are characters to read from python
-          while (Serial.available()) {
+          while (USBSerial.available()) {
             //Read character
             char msgChar = '\0';
-            msgChar = Serial.read();
+            msgChar = USBSerial.read();
             //If it is a new line
             if (msgChar == '\n') {
               //If the message is 'next' - to indicate that it is ready for the next item
@@ -468,7 +476,7 @@ void downloadFile() {
         //If the download did not time out
         if (!terminated) {
           //Keyword to indicate the next line
-          Serial.write("download ");
+          USBSerial.write("download ");
         }
       }
       //Store the final character that was sent
@@ -477,17 +485,17 @@ void downloadFile() {
 
     //If the file did not terminate with a newline send one to terminate the command (and there was something to send)
     if (lastChar != '\n' && charNumber > 0 && !terminated) {
-      Serial.write("\n");
+      USBSerial.write("\n");
     }
 
     //Close the file
     fileToSend.close();
     if (!terminated) {
       //Send message to indicate that file has been downloaded fully
-      Serial.write("download stop\n");
+      USBSerial.write("download stop\n");
     } else {
       //Send message to indicate that something went wrong
-      Serial.write("download failed\n");
+      USBSerial.write("download failed\n");
     }
 
     if(restarting){
@@ -496,15 +504,15 @@ void downloadFile() {
 
   } else {
     //Message to indicate that the requested file does not exist
-    Serial.write("failed download nofile\n");
+    USBSerial.write("failed download nofile\n");
   }
 }
 
 void readSerial() {
   /*Read data if it is available*/
-  if (Serial.available()) {
+  if (USBSerial.available()) {
     //Read the next character from serial
-    char c = Serial.read();
+    char c = USBSerial.read();
     //If it is a new line
     if (c == '\n') {
       //If there is other stored text
@@ -529,21 +537,21 @@ void readSerial() {
 void outputCalibration() {
   /*Send the current calibration values via serial*/
   //Send the start of the calibration data message
-  Serial.write("currentcal ");
+  USBSerial.write("currentcal ");
   //Iterate methane
   for (int i = 0; i < 4; i++) {
     //Send the calibration part
-    Serial.print(ch4Calibration[i]);
-    Serial.print(" ");
+    USBSerial.print(ch4Calibration[i]);
+    USBSerial.print(" ");
   }
   //Iterate carbon dioxide
   for (int i = 0; i < 4; i++) {
     //Send the calibration part followed by a space or new line for the last value
     if (i != 3) {
-      Serial.print(co2Calibration[i]);
-      Serial.print(" ");
+      USBSerial.print(co2Calibration[i]);
+      USBSerial.print(" ");
     } else {
-      Serial.println(co2Calibration[i]);
+      USBSerial.println(co2Calibration[i]);
     }
   }
 }
@@ -590,13 +598,13 @@ void processMessage() {
 
   //If it is an info request, respond with calibrating status
   if (strcmp(msgParts[0], "info") == 0) {
-    Serial.write("info ");
+    USBSerial.write("info ");
     if (calibrating) {
-      Serial.write("true ");
+      USBSerial.write("true ");
     } else {
-      Serial.write("false ");
+      USBSerial.write("false ");
     }
-    Serial.println(valveOpen);
+    USBSerial.println(valveOpen);
   }
   //If it is a request for the file names, send the list of names
   else if (strcmp(msgParts[0], "files") == 0) {
@@ -656,9 +664,9 @@ void processMessage() {
       }
       //Set the time from the values
       setRTCTime(timeValuesInt[0], timeValuesInt[1], timeValuesInt[2], timeValuesInt[3], timeValuesInt[4], timeValuesInt[5]);
-      Serial.write("done timeset\n");
+      USBSerial.write("done timeset\n");
     } else {
-      Serial.write("failed timeset notcalibrating\n");
+      USBSerial.write("failed timeset notcalibrating\n");
     }
   }
   //If it is a request for the time in the clock
@@ -666,18 +674,18 @@ void processMessage() {
     //Get the time
     getTime();
     //Ouput the time over serial
-    Serial.write("time ");
-    Serial.print(timeParts[0]);
-    Serial.print(",");
-    Serial.print(timeParts[1]);
-    Serial.print(",");
-    Serial.print(timeParts[2]);
-    Serial.print(",");
-    Serial.print(timeParts[3]);
-    Serial.print(",");
-    Serial.print(timeParts[4]);
-    Serial.print(",");
-    Serial.println(timeParts[5]);
+    USBSerial.write("time ");
+    USBSerial.print(timeParts[0]);
+    USBSerial.print(",");
+    USBSerial.print(timeParts[1]);
+    USBSerial.print(",");
+    USBSerial.print(timeParts[2]);
+    USBSerial.print(",");
+    USBSerial.print(timeParts[3]);
+    USBSerial.print(",");
+    USBSerial.print(timeParts[4]);
+    USBSerial.print(",");
+    USBSerial.println(timeParts[5]);
   }
   //If it is a request to start calibrating
   else if (strcmp(msgParts[0], "startcal") == 0) {
@@ -690,9 +698,9 @@ void processMessage() {
         closeValve(currentValve);
       }
       currentState = 0;
-      Serial.write("done startcal\n");
+      USBSerial.write("done startcal\n");
     } else {
-      Serial.write("failed startcal calibrating\n");
+      USBSerial.write("failed startcal calibrating\n");
     }
     //Send the stored calibration
     outputCalibration();
@@ -703,9 +711,9 @@ void processMessage() {
     if (calibrating) {
       //Return to normal mode
       calibrating = false;
-      Serial.write("done endcal\n");
+      USBSerial.write("done endcal\n");
     } else {
-      Serial.write("failed endcal notcalibrating\n");
+      USBSerial.write("failed endcal notcalibrating\n");
     }
   }
   //If it is a request to download a file
@@ -724,10 +732,10 @@ void processMessage() {
       //Delete the file
       SD.remove(msgParts[1]);
       //Send signal that file was removed successfully
-      Serial.write("done delete\n");
+      USBSerial.write("done delete\n");
     } else {
       //Send signal that the file did not exist
-      Serial.write("failed delete nofile\n");
+      USBSerial.write("failed delete nofile\n");
     }
   }
   //If it is a request to perform a calibration point
@@ -769,21 +777,21 @@ void processMessage() {
           //Store time
           lastAction = millis();
         } else {
-          Serial.write("failed point invalidtype\n");
+          USBSerial.write("failed point invalidtype\n");
         }
       } else {
-        Serial.write("failed point alreadychecking\n");
+        USBSerial.write("failed point alreadychecking\n");
       }
     } else {
-      Serial.write("failed point notcalibrating\n");
+      USBSerial.write("failed point notcalibrating\n");
     }
   }
   //If it is a request to set the calibration of either type
   else if (strcmp(msgParts[0], "setch4cal") == 0 || strcmp(msgParts[0], "setco2cal") == 0) {
-    Serial.write("Found calibration set command\n");
+    USBSerial.write("Found calibration set command\n");
     //If in calibration mode
     if (calibrating) {
-      Serial.write("Setting calibration\n");
+      USBSerial.write("Setting calibration\n");
       //Check if setting methane or carbon dioxide
       currentCalDataCh4 = strcmp(msgParts[0], "setch4cal") == 0;
       //Create char buffer to store data
@@ -834,9 +842,9 @@ void processMessage() {
       }
       //Store calibration in file
       writeCalibration(currentCalDataCh4);
-      Serial.write("done calset\n");
+      USBSerial.write("done calset\n");
     } else {
-      Serial.write("failed calset notcalibrating\n");
+      USBSerial.write("failed calset notcalibrating\n");
     }
     //Output the current calibration via serial
     outputCalibration();
@@ -850,10 +858,10 @@ void processMessage() {
       int flushReceived = atoi(msgParts[2]);
       //Check neither value was 0
       if (openReceived == 0) {
-        Serial.write("failed timingset noopen\n");
+        USBSerial.write("failed timingset noopen\n");
       } else {
         if (flushReceived == 0) {
-          Serial.write("failed timingset noflush\n");
+          USBSerial.write("failed timingset noflush\n");
         } else {
           //Store the values as UL
           openDuration = (unsigned long)openReceived;
@@ -862,11 +870,11 @@ void processMessage() {
           readInterval = (unsigned long)floor(openDuration / 60);
           //Update the timing file
           writeTiming();
-          Serial.write("done timingset\n");
+          USBSerial.write("done timingset\n");
         }
       }
     } else {
-      Serial.write("failed timingset notcalibrating\n");
+      USBSerial.write("failed timingset notcalibrating\n");
     }
   }
   //If it is a request for the current valve timings
@@ -874,26 +882,26 @@ void processMessage() {
     //If in calibration mode
     if (calibrating) {
       //Send the valve timings
-      Serial.print("timing ");
-      Serial.print(openDuration);
-      Serial.print(" ");
-      Serial.println(flushDuration);
+      USBSerial.print("timing ");
+      USBSerial.print(openDuration);
+      USBSerial.print(" ");
+      USBSerial.println(flushDuration);
     } else {
-      Serial.write("failed timingget notcalibrating\n");
+      USBSerial.write("failed timingget notcalibrating\n");
     }
   }
   //If it is a request for the in service state
   else if (strcmp(msgParts[0], "serviceget") == 0) {
     //Write the service data
-    Serial.write("service");
+    USBSerial.write("service");
     for (int i = 0; i < 15; i++) {
       if (inService[i]) {
-        Serial.write(" 1");
+        USBSerial.write(" 1");
       } else {
-        Serial.write(" 0");
+        USBSerial.write(" 0");
       }
     }
-    Serial.write("\n");
+    USBSerial.write("\n");
   }
   //If it is a request to set the in service state
   else if (strcmp(msgParts[0], "serviceset") == 0) {
@@ -906,28 +914,28 @@ void processMessage() {
       }
       //Update in service file
       writeInService();
-      Serial.write("done serviceset\n");
+      USBSerial.write("done serviceset\n");
     } else {
-      Serial.write("failed serviceset notcalibrating\n");
+      USBSerial.write("failed serviceset notcalibrating\n");
     }
   }
   //If it is a request for past data points
   else if (strcmp(msgParts[0], "getpast") == 0) {
     //Send each of the stored data points
-    Serial.print("pastdata ");
+    USBSerial.print("pastdata ");
     //Iterate points
     for(int i = 0; i < 15; i++){
       //Send methane
-      Serial.print(previousCh4Percent[i]);
-      Serial.print(" ");
+      USBSerial.print(previousCh4Percent[i]);
+      USBSerial.print(" ");
       //If it is not the last
       if(i < 14){
         //Send carbon dioxide
-        Serial.print(previousCo2Percent[i]);
-        Serial.print(" ");
+        USBSerial.print(previousCo2Percent[i]);
+        USBSerial.print(" ");
       }else{
         //Send carbon dioxide with new line
-        Serial.println(previousCo2Percent[i]);
+        USBSerial.println(previousCo2Percent[i]);
       }
     }
   }
@@ -1156,7 +1164,7 @@ void writeTiming() {
   currentFile.println(flushDuration);
   //Close the file
   currentFile.close();
-  Serial.write("Timing file written\n");
+  USBSerial.write("Timing file written\n");
 }
 
 void readInService() {
@@ -1287,9 +1295,9 @@ void closeValve(int valveNumber) {
     delay(100);
     //Set the solenoid pin to low
     digitalWrite(solenoidValvePins[valveNumber], LOW);
-    Serial.write("valve ");
-    Serial.print(valveNumber);
-    Serial.write(" closed\n");
+    USBSerial.write("valve ");
+    USBSerial.print(valveNumber);
+    USBSerial.write(" closed\n");
 
     if(valveNumber == valveOpen){
       valveOpen = -1;
@@ -1436,25 +1444,25 @@ void writeData() {
   currentFile.println(actualCo2 - subtractModifier);
   currentFile.close();
   //Send the valve, maximums and A to D values via serial followed by the peak values
-  Serial.print("dataPoint ");
-  Serial.print(currentValve);
-  Serial.print(' ');
-  Serial.print(ch4Max);
-  Serial.print(' ');
-  Serial.print(co2Max);
-  Serial.print(' ');
-  Serial.print(actualCh4);
-  Serial.print(' ');
-  Serial.print(actualCo2);
+  USBSerial.print("dataPoint ");
+  USBSerial.print(currentValve);
+  USBSerial.print(' ');
+  USBSerial.print(ch4Max);
+  USBSerial.print(' ');
+  USBSerial.print(co2Max);
+  USBSerial.print(' ');
+  USBSerial.print(actualCh4);
+  USBSerial.print(' ');
+  USBSerial.print(actualCo2);
   for (int i = 0; i < 5; i++) {
-    Serial.print(' ');
-    Serial.print(ch4ValuesPeak[i]);
+    USBSerial.print(' ');
+    USBSerial.print(ch4ValuesPeak[i]);
   }
   for (int i = 0; i < 5; i++) {
-    Serial.print(' ');
-    Serial.print(co2ValuesPeak[i]);
+    USBSerial.print(' ');
+    USBSerial.print(co2ValuesPeak[i]);
   }
-  Serial.print('\n');
+  USBSerial.print('\n');
 
   //Open the extra file to store the peak values
   File extraFile = SD.open(extraOutputFileName, FILE_WRITE);
@@ -1483,7 +1491,7 @@ void writeData() {
   extraFile.print(",");
   extraFile.println(co2Max);
   extraFile.close();
-  Serial.write("All file writes done\n");
+  USBSerial.write("All file writes done\n");
 
   //Store integer versions for retrieval later
   previousCh4Percent[currentValve] = floor(actualCh4);
@@ -1696,16 +1704,16 @@ void updateCalibrationRead() {
       //Close the flush valve
       closeValve(15);
       //Output the calibration point via serial
-      Serial.write("calpoint ");
+      USBSerial.write("calpoint ");
       //For methane
       if (checkingCh4) {
-        Serial.write("ch4 ");
-        Serial.println(calCh4Max);
+        USBSerial.write("ch4 ");
+        USBSerial.println(calCh4Max);
       }
       //For carbon dioxide
       else if (checkingCo2) {
-        Serial.write("co2 ");
-        Serial.println(calCo2Max);
+        USBSerial.write("co2 ");
+        USBSerial.println(calCo2Max);
       }
       flushingCalibration = false;
       readingCalibration = false;
