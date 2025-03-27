@@ -541,17 +541,17 @@ void outputCalibration() {
   //Iterate methane
   for (int i = 0; i < 4; i++) {
     //Send the calibration part
-    USBSerial.print(ch4Calibration[i]);
+    USBSerial.print(ch4Calibration[i], 4);
     USBSerial.print(" ");
   }
   //Iterate carbon dioxide
   for (int i = 0; i < 4; i++) {
     //Send the calibration part followed by a space or new line for the last value
     if (i != 3) {
-      USBSerial.print(co2Calibration[i]);
+      USBSerial.print(co2Calibration[i], 4);
       USBSerial.print(" ");
     } else {
-      USBSerial.println(co2Calibration[i]);
+      USBSerial.println(co2Calibration[i], 4);
     }
   }
 }
@@ -1471,9 +1471,9 @@ void writeData() {
     currentFile.print(',');
     currentFile.print(co2Max);
     currentFile.print(',');
-    currentFile.print(actualCh4);
+    currentFile.print(actualCh4, 3);
     currentFile.print(',');
-    currentFile.println(actualCo2);
+    currentFile.println(actualCo2, 3);
     //currentFile.print(',');
     //currentFile.print(actualCh4 - subtractModifier);
     //currentFile.print(',');
@@ -1492,9 +1492,9 @@ void writeData() {
   Serial.print(' ');
   Serial.print(co2Max);
   Serial.print(' ');
-  Serial.print(actualCh4);
+  Serial.print(actualCh4, 3);
   Serial.print(' ');
-  Serial.print(actualCo2);
+  Serial.print(actualCo2, 3);
   for (int i = 0; i < 5; i++) {
     USBSerial.print(' ');
     USBSerial.print(ch4ValuesPeak[i]);
