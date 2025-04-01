@@ -1,6 +1,7 @@
-/* Version 0.4
+/* Version 0.5
 Changes this version:
--Switched method of reading  values from sensors
+-Allowed time and calibration to be retrieved while logging
+-Adjusted rounding on output statements
 */
 
 #include <SPI.h>
