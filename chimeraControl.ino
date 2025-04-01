@@ -1525,8 +1525,8 @@ void writeData() {
     extraFile.print(",");
     extraFile.println(co2Max);
     extraFile.close();
-    Serial.write("All file writes done\n");
   }
+  Serial.write("All file writes done\n");
   //Store integer versions for retrieval later
   previousCh4Percent[currentValve] = floor(actualCh4);
   previousCo2Percent[currentValve] = floor(actualCo2);
