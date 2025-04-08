@@ -705,6 +705,9 @@ void processMessage() {
       if (currentState == 1) {
         closeValve(currentValve);
       }
+      if (currentState == 3){
+        closeValve(15);
+      }
       currentState = 0;
       USBSerial.write("done startcal\n");
     } else {
@@ -719,6 +722,9 @@ void processMessage() {
     if (calibrating) {
       //Return to normal mode
       calibrating = false;
+      if (!inService[currentValve]){
+        currentValve = nextValve();
+      }
       USBSerial.write("done endcal\n");
     } else {
       USBSerial.write("failed endcal notcalibrating\n");
@@ -1569,7 +1575,7 @@ int nextValve() {
       //Get next valve position
       int newValve = i + currentValve;
       //If the valve is outside of the range
-      if (newValve > 14) {
+      while (newValve > 14) {
         //Move back round to start of sequence
         newValve = newValve - 15;
       }
