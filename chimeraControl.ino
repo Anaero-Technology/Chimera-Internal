@@ -1693,6 +1693,14 @@ void updateValves() {
   }
 }
 
+void sendCalibrationToSensor(bool methane) {
+  if (methane){
+    gasSensor.sendCommand(0x01, 0x00);//Not right but need command structure
+  }else{
+    gasSensor.sendCommand(0x02, 0x00);//Not right but need command structure
+  }
+}
+
 void resetCalibrationValues() {
   /*Reset all the information about calibration logging*/
   calCh4Max = 0;
