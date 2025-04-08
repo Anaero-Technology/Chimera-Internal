@@ -9,8 +9,9 @@ Changes this version:
 #include "RTClib.h"
 #include <Wire.h>
 #include <ESP32AnalogRead.h>
-#include "USB.h"        
-#include "USBCDC.h"     
+#include "USB.h"
+#include "USBCDC.h"
+#include <RS485Sensor.h>
 
 const int averageCount = 16;
 
@@ -154,6 +155,9 @@ int valveOpen = -1;
 
 ESP32AnalogRead adc;
 
+//Initialise with default pins (RX: 44, TX: 43, RTS: 45)
+RS485Sensor gasSensor(RS485_RX_PIN, RS485_TX_PIN, RS485_RTS_PIN);
+
 void setup() {
   //Change the attenuation on the Analogue to Digital converter
   //analogSetAttenuation(ADC_6db);
@@ -211,6 +215,9 @@ void setup() {
     //Close the valve
     digitalWrite(solenoidValvePins[i], LOW);
   }
+
+  //Start sensor to read gas values
+  gasSensor.begin();
 
   USBSerial.write("Starting calibration.\n");
   //Read calibration values if possible
@@ -1357,6 +1364,12 @@ void readValues() {
   int ch4Value = adc.readMiliVolts();
   //Delay to allow A to D to process
   delay(20);
+  float co2Level = gasSensor.sendCommand(0x02, 0x20);
+  float ch4Level = gasSensor.sendCommand(0x01, 0x20);
+  USBSerial.write("Sensor Percentages: CH4:");
+  USBSerial.print(ch4Level);
+  USBSerial.write(" CO2:");
+  USBSerial.println(co2Level);
   //Store value in averaging array
   ch4ValueSet[setPosition] = ch4Value;
   co2ValueSet[setPosition] = co2Value;
