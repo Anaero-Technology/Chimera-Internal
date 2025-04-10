@@ -55,7 +55,8 @@ bool inService[15] = { true, true, true, true, true, true, true, true, true, tru
 int ch4Values[5] = { 0, 0, 0, 0, 0 };
 int co2Values[5] = { 0, 0, 0, 0, 0 };
 //Where the next value is being placed
-int currentValueIndex = 0;
+int currentValueIndexCh4 = 0;
+int currentValueIndexCo2 = 0;
 //The 5 values up to and including the peak value for each sensor
 int ch4ValuesPeak[5] = { 0, 0, 0, 0, 0 };
 int co2ValuesPeak[5] = { 0, 0, 0, 0, 0 };
@@ -63,7 +64,8 @@ int co2ValuesPeak[5] = { 0, 0, 0, 0, 0 };
 int ch4ValueSet[averageCount];
 int co2ValueSet[averageCount];
 //Current index within the set of values - used to determine if an average needs to be taken and reset
-int setPosition = 0;
+int setPositionCh4 = 0;
+int setPositionCo2 = 0;
 
 //Current index within the set of calibration averaging valuves
 int calSetPosition = 0;
@@ -703,7 +705,6 @@ void processMessage() {
       USBSerial.write("failed delete nofile\n");
     }
   }
-  //IMPORTANT - NEEDS CHANGING
   //If it is a request to perform a calibration point
   else if (strcmp(msgParts[0], "point") == 0) {
     //If in calibration mode
@@ -818,6 +819,10 @@ void processMessage() {
         USBSerial.println(previousCo2Percent[i]);
       }
     }
+  }
+  //If it is a request for the sensor information
+  else if (strcmp(msgParts[0], "sensorsget") == 0) {
+    outputSensors();
   }
 }
 
@@ -1060,10 +1065,12 @@ void resetValues() {
     co2ValueSet[i] = 0;
   }
   //Reset the current positions and maximums
-  currentValueIndex = 0;
+  currentValueIndexCh4 = 0;
+  currentValueIndexCo2 = 0;
   ch4Max = 0;
   co2Max = 0;
-  setPosition = 0;
+  setPositionCh4 = 0;
+  setPositionCo2 = 0;
 }
 
 void readValues() {
@@ -1078,98 +1085,133 @@ void readValues() {
   USBSerial.print(ch4Level);
   USBSerial.write(" CO2:");
   USBSerial.println(co2Level);
-  //Store value in averaging array
-  ch4ValueSet[setPosition] = ch4Level;
-  co2ValueSet[setPosition] = co2Level;
-  //Increment store position
-  setPosition = setPosition + 1;
+  //If it is a valid value
+  if (ch4Level >= 0.0) {
+    //Store value in averaging array
+    ch4ValueSet[setPositionCh4] = ch4Level;
+    //Increment store position
+    setPositionCh4 = setPositionCh4 + 1;
+  }
+  //If it is a valid value
+  if (co2Level >= 0.0) {
+    //Store value in averaging array
+    co2ValueSet[setPositionCo2] = co2Level;
+    //Increment store position
+    setPositionCo2 = setPositionCo2 + 1;
+  }
   //If count has been reached for calculating the average
-  if (setPosition >= averageCount) {
-    //Average stored values and add to data
-    calculateValues();
+  if (setPositionCh4 >= averageCount) {
+    //Average stored values and add to data for ch4
+    calculateValues(true);
     //Reset average counter position
-    setPosition = 0;
+    setPositionCh4 = 0;
+  }
+  if (setPositionCo2 > averageCount){
+    //Average stored values and add to data for co2
+    calculateValues(false);
+    //Reset average counter position
+    setPositionCo2 = 0;
   }
 }
 
-void calculateValues() {
+void calculateValues(bool methane) {
   /*Average read values and store*/
-  int totalCh4 = 0;
+  int total = 0;
   int totalCo2 = 0;
   //Iterate through values being averaged
   for (int i = 0; i < averageCount; i++) {
     //Sum values
-    totalCh4 = totalCh4 + ch4ValueSet[i];
-    totalCo2 = totalCo2 + co2ValueSet[i];
+    if (methane){
+      total = total + ch4ValueSet[i];
+    }else{
+      total = total + co2ValueSet[i];
+    }
   }
   //Divide by count to find average
-  int ch4Result = floor(totalCh4 / averageCount);
-  int co2Result = floor(totalCo2 / averageCount);
+  int result = floor(total / averageCount);
 
-  //If the current peak exceeds start
-  if (currentValueIndex > 4) {
-    //Iterate through items after the first
-    for (int i = 1; i < 5; i++) {
-      //Move down one place
-      ch4Values[i - 1] = ch4Values[i];
-      co2Values[i - 1] = co2Values[i];
-    }
-    //Add new values to the end
-    ch4Values[4] = ch4Result;
-    co2Values[4] = co2Result;
-  } else {
-    //Add values to current end position
-    ch4Values[currentValueIndex] = ch4Result;
-    co2Values[currentValueIndex] = co2Result;
-    //Increment current position
-    currentValueIndex = currentValueIndex + 1;
-  }
-
-  //If this is a normal channel
-  if (currentState != 3){
-    //If a new peak methane has been found
-    if (ch4Result > ch4Max) {
-      //Store the new maximum value
-      ch4Max = ch4Result;
-      //Iterate through peak length
-      for (int i = 0; i < 5; i++) {
-        //Store current values in peak
-        ch4ValuesPeak[i] = ch4Values[i];
+  if(methane){
+    //If the current peak exceeds start
+    if (currentValueIndexCh4 > 4) {
+      //Iterate through items after the first
+      for (int i = 1; i < 5; i++) {
+        //Move down one place
+        ch4Values[i - 1] = ch4Values[i];
       }
+      //Add new values to the end
+      ch4Values[4] = result;
+    } else {
+      //Add values to current end position
+      ch4Values[currentValueIndexCh4] = result;
+      //Increment current position
+      currentValueIndexCh4 = currentValueIndexCh4 + 1;
     }
-    //If a new peak carbon dioxide has been found
-    if (co2Result > co2Max) {
-      //Store the new maximum value
-      co2Max = co2Result;
-      //Iterate through peak length
-      for (int i = 0; i < 5; i++) {
-        //Store current values in peak
-        co2ValuesPeak[i] = co2Values[i];
-      }
-    }
-  //If this is a flushing channel
   }else{
-    //If a new minimum methane has been found
-    if (ch4Result < ch4Max) {
-      //Store the new maximum value
-      ch4Max = ch4Result;
-      //Iterate through peak length
-      for (int i = 0; i < 5; i++) {
-        //Store current values in peak
-        ch4ValuesPeak[i] = ch4Values[i];
+    //If the current peak exceeds start
+    if (currentValueIndexCo2 > 4) {
+      //Iterate through items after the first
+      for (int i = 1; i < 5; i++) {
+        //Move down one place
+        co2Values[i - 1] = co2Values[i];
+      }
+      //Add new values to the end
+      co2Values[4] = result;
+    } else {
+      //Add values to current end position
+      co2Values[currentValueIndexCo2] = result;
+      //Increment current position
+      currentValueIndexCo2 = currentValueIndexCo2 + 1;
+    }
+  }
+
+  if (methane){
+    //If this is a normal channel
+    if (currentState != 3){
+      //If a new peak methane has been found
+      if (result > ch4Max) {
+        //Store the new maximum value
+        ch4Max = result;
+        //Iterate through peak length
+        for (int i = 0; i < 5; i++) {
+          //Store current values in peak
+          ch4ValuesPeak[i] = ch4Values[i];
+        }
+      }
+    } else {
+      if (result < ch4Max) {
+        //Store the new maximum value
+        ch4Max = result;
+        //Iterate through peak length
+        for (int i = 0; i < 5; i++) {
+          //Store current values in peak
+          ch4ValuesPeak[i] = ch4Values[i];
+        }
       }
     }
-    //If a new minimum carbon dioxide has been found
-    if (co2Result < co2Max) {
-      //Store the new maximum value
-      co2Max = co2Result;
-      //Iterate through peak length
-      for (int i = 0; i < 5; i++) {
-        //Store current values in peak
-        co2ValuesPeak[i] = co2Values[i];
+  } else {
+    if (currentState != 3){
+      if (result > co2Max) {
+        //Store the new maximum value
+        co2Max = result;
+        //Iterate through peak length
+        for (int i = 0; i < 5; i++) {
+          //Store current values in peak
+          co2ValuesPeak[i] = co2Values[i];
+        }
+      }
+    }else{
+      if (result < co2Max) {
+        //Store the new maximum value
+        co2Max = result;
+        //Iterate through peak length
+        for (int i = 0; i < 5; i++) {
+          //Store current values in peak
+          co2ValuesPeak[i] = co2Values[i];
+        }
       }
     }
   }
+  
 }
 
 void writeData() {
@@ -1394,7 +1436,7 @@ void updateValves() {
 }
 
 void outputSensors() {
-  USBSerial.write("1 CH4 2 CO2\n");
+  USBSerial.write("sensorTypes 1 CH4 2 CO2\n");
 }
 
 void performCalibration(uint8_t sensor, uint16_t amount) {
