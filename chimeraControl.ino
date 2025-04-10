@@ -706,7 +706,7 @@ void processMessage() {
     }
   }
   //If it is a request to perform a calibration point
-  else if (strcmp(msgParts[0], "point") == 0) {
+  else if (strcmp(msgParts[0], "calibrate") == 0) {
     //If in calibration mode
     if (calibrating) {
       //If not already reading a point
@@ -1441,21 +1441,27 @@ void outputSensors() {
 }
 
 void performCalibration(uint8_t sensor, uint16_t amount) {
-  if (sensor > 0 && sensor <= numberSensors && amount >= 0 && amount <= 100){
-    USBSerial.write("");
-    openValve(flushValve);
-    delay(10000);
-    gasSensor.calibrateZero(sensor);
-    openValve(0);
-    USBSerial.write("");
-    delay(10000);
-    gasSensor.calibrateSpan(sensor, amount);
-    delay(5000);
-    USBSerial.write("");
-    closeValve(0);
-    openValve(flushValve);
-    delay(5000);
-    USBSerial.write("");
+  if (sensor > 0 && sensor <= numberSensors){
+    if(amount >= 0 && amount <= 100){
+      USBSerial.write("calibration starting\n");
+      openValve(flushValve);
+      delay(10000);
+      gasSensor.calibrateZero(sensor);
+      openValve(0);
+      USBSerial.write("calibration opening\n");
+      delay(10000);
+      gasSensor.calibrateSpan(sensor, amount);
+      delay(5000);
+      USBSerial.write("calibration finishing\n");
+      closeValve(0);
+      openValve(flushValve);
+      delay(5000);
+      USBSerial.write("done calibration\n");
+    }else{
+      USBSerial.write("failed calibration invalidpercent\n");
+    }
+  }else{
+    USBSerial.write("failed calibration invalidsensor\n");
   }
 }
 
