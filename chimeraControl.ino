@@ -1,7 +1,7 @@
-/* Version 0.5
+/* Version 0.6
 Changes this version:
--Allowed time and calibration to be retrieved while logging
--Adjusted rounding on output statements
+- Changed to use RS485 Sensors to get values
+- Calibration calculations replaced by sensor calibration
 */
 
 #include <SPI.h>
@@ -14,6 +14,7 @@ Changes this version:
 #include <RS485Sensor.h>
 
 const int averageCount = 16;
+const int numberSensors = 2;
 
 //Valve pins for each of the channels (and flush)
 const int solenoidValvePins[16] = { 21, 34, 35, 36, 16, 15, 14, 13, 12, 11, 10, 9, 5, 6, 7, 8 };
@@ -64,9 +65,6 @@ int co2ValueSet[averageCount];
 //Current index within the set of values - used to determine if an average needs to be taken and reset
 int setPosition = 0;
 
-//The set of values to be averaged from each sensor to produce a calibration data point
-int calCh4ValueSet[averageCount];
-int calCo2ValueSet[averageCount];
 //Current index within the set of calibration averaging valuves
 int calSetPosition = 0;
 
@@ -86,14 +84,8 @@ const int flushValve = 15;
 const int positive = 26;
 const int negative = 33;
 
-//Calibration arrays - used to convert sensor integer to percentages
-double ch4Calibration[4];
-double co2Calibration[4];
-
 //If the current calibration being handled is methane
 bool currentCalDataCh4 = false;
-//Array to hold received calibration values
-double newCalibration[4];
 
 //Current line array in the file being read
 char fileLine[100];
@@ -112,16 +104,12 @@ char fileToDownload[33];
 int downloadTimeout = 5;
 
 //Booleans to store current calibration states
-bool calibrated = false;
 bool calibrating = false;
-bool readingCalibration = false;
 //Booleans to know what kind of message to send back once calibration points are done
 bool checkingCh4 = false;
 bool checkingCo2 = false;
 bool flushingCalibration = false;
-//Maximum values found during calibration read
-int calCh4Max = 0;
-int calCo2Max = 0;
+
 //Timing for calibration read
 unsigned long calWaitTime;
 //To store the current time
@@ -138,8 +126,8 @@ const int outputFilePos = 16;
 //Create the real time clock
 RTC_DS3231 rtc;
 
-// Create an USB Serial port
-USBCDC USBSerial;               // Create Object @@@@ USB_Update Branch
+// Create a USB Serial port
+USBCDC USBSerial;
 
 //Arrays to store the time as text and numbers
 char timeStamp[19];
@@ -152,8 +140,6 @@ int previousCh4Percent[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int previousCo2Percent[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 int valveOpen = -1;
-
-ESP32AnalogRead adc;
 
 //Initialise with default pins (RX: 44, TX: 43, RTS: 45)
 RS485Sensor gasSensor(RS485_RX_PIN, RS485_TX_PIN, RS485_RTS_PIN);
@@ -218,24 +204,6 @@ void setup() {
 
   //Start sensor to read gas values
   gasSensor.begin();
-
-  USBSerial.write("Starting calibration.\n");
-  //Read calibration values if possible
-  readCalibration();
-  if (calibrated) {
-    USBSerial.write("Calibrated Successfully.\n");
-  } else {
-    USBSerial.write("Calibration read failed.\n");
-  }
-  //Output the read calibration values
-  USBSerial.write("Methane:\n");
-  for (int i = 0; i < 4; i++) {
-    USBSerial.println(ch4Calibration[i], 6);
-  }
-  USBSerial.write("\nCarbon Dioxide:\n");
-  for (int i = 0; i < 4; i++) {
-    USBSerial.println(co2Calibration[i], 6);
-  }
 
   //Read the timing and in service files
   readTiming();
@@ -542,28 +510,6 @@ void readSerial() {
   }
 }
 
-void outputCalibration() {
-  /*Send the current calibration values via serial*/
-  //Send the start of the calibration data message
-  USBSerial.write("currentcal ");
-  //Iterate methane
-  for (int i = 0; i < 4; i++) {
-    //Send the calibration part
-    USBSerial.print(ch4Calibration[i], 4);
-    USBSerial.print(" ");
-  }
-  //Iterate carbon dioxide
-  for (int i = 0; i < 4; i++) {
-    //Send the calibration part followed by a space or new line for the last value
-    if (i != 3) {
-      USBSerial.print(co2Calibration[i], 4);
-      USBSerial.print(" ");
-    } else {
-      USBSerial.println(co2Calibration[i], 4);
-    }
-  }
-}
-
 void processMessage() {
   /*Handle the incoming message and respond appropriately*/
   int part = 0;
@@ -720,8 +666,6 @@ void processMessage() {
     } else {
       USBSerial.write("failed startcal calibrating\n");
     }
-    //Send the stored calibration
-    outputCalibration();
   }
   //If it is a request to end calibration
   else if (strcmp(msgParts[0], "endcal") == 0) {
@@ -759,116 +703,31 @@ void processMessage() {
       USBSerial.write("failed delete nofile\n");
     }
   }
+  //IMPORTANT - NEEDS CHANGING
   //If it is a request to perform a calibration point
   else if (strcmp(msgParts[0], "point") == 0) {
     //If in calibration mode
     if (calibrating) {
       //If not already reading a point
-      if (!readingCalibration) {
-        //Store the time to wait for
-        int waitTime = atoi(msgParts[2]);
-        //Convert to UL and use default value if invalid
-        if (waitTime == 0) {
-          calWaitTime = 3000UL;
-        } else {
-          calWaitTime = (unsigned long)waitTime;
-        }
-        //If checking methane
-        if (strcmp(msgParts[1], "ch4") == 0) {
-          //Store correct gasses
-          checkingCh4 = true;
-          checkingCo2 = false;
-          resetCalibrationValues();
-          //Start reading
-          readingCalibration = true;
-          //Open the valve
-          openValve(0);
-          //Store time
-          lastAction = millis();
-          //If checking carbon dioxide
-        } else if (strcmp(msgParts[1], "co2") == 0) {
-          //Store correct gasses
-          checkingCo2 = true;
-          checkingCh4 = false;
-          resetCalibrationValues();
-          //Start reading
-          readingCalibration = true;
-          //Open the valve
-          openValve(0);
-          //Store time
-          lastAction = millis();
-        } else {
-          USBSerial.write("failed point invalidtype\n");
+      //Store the time to wait for
+      int sensorNumber = atoi(msgParts[1]);
+      int calibrationPercentage = atoi(msgParts[2]);
+      //Convert to UL and use default value if invalid
+      calWaitTime = 3000UL;
+      if (sensorNumber > 0 && sensorNumber <= numberSensors){
+        if (calibrationPercentage >= 0 && calibrationPercentage <= 100){
+          uint8_t targetSensor = sensorNumber;
+          uint16_t targetPercentage = calibrationPercentage;
+          performCalibration(targetSensor, targetPercentage);
+        }else{
+          USBSerial.write("failed point invalidpercentage\n");
         }
       } else {
-        USBSerial.write("failed point alreadychecking\n");
+        USBSerial.write("failed point invalidtype\n");
       }
     } else {
       USBSerial.write("failed point notcalibrating\n");
     }
-  }
-  //If it is a request to set the calibration of either type
-  else if (strcmp(msgParts[0], "setch4cal") == 0 || strcmp(msgParts[0], "setco2cal") == 0) {
-    USBSerial.write("Found calibration set command\n");
-    //If in calibration mode
-    if (calibrating) {
-      USBSerial.write("Setting calibration\n");
-      //Check if setting methane or carbon dioxide
-      currentCalDataCh4 = strcmp(msgParts[0], "setch4cal") == 0;
-      //Create char buffer to store data
-      char* calPart;
-      //Split based on |
-      calPart = strtok(msgParts[1], "|");
-      //If there is a part
-      if (calPart != NULL) {
-        //Convert to floating point value
-        newCalibration[0] = atof(calPart);
-      } else {
-        //Use default as 0
-        newCalibration[0] = 0.0;
-      }
-      //Split again
-      calPart = strtok(NULL, "|");
-      //Convert to float and store if found
-      if (calPart != NULL) {
-        newCalibration[1] = atof(calPart);
-      } else {
-        newCalibration[1] = 0.0;
-      }
-      //Split again
-      calPart = strtok(msgParts[2], "|");
-      //Convert to float and store if found
-      if (calPart != NULL) {
-        newCalibration[2] = atof(calPart);
-      } else {
-        newCalibration[2] = 0.0;
-      }
-      //Split again
-      calPart = strtok(NULL, "|");
-      //Convert to float and store if found
-      if (calPart != NULL) {
-        newCalibration[3] = atof(calPart);
-      } else {
-        newCalibration[3] = 0.0;
-      }
-
-      //Iterate through calibration points
-      for (int i = 0; i < 4; i++) {
-        //Store in methane or carbon dioxide based on command
-        if (currentCalDataCh4) {
-          ch4Calibration[i] = newCalibration[i];
-        } else {
-          co2Calibration[i] = newCalibration[i];
-        }
-      }
-      //Store calibration in file
-      writeCalibration(currentCalDataCh4);
-      USBSerial.write("done calset\n");
-    } else {
-      USBSerial.write("failed calset notcalibrating\n");
-    }
-    //Output the current calibration via serial
-    outputCalibration();
   }
   //If it is a request to set the valve timings
   else if (strcmp(msgParts[0], "timingset") == 0) {
@@ -960,154 +819,11 @@ void processMessage() {
       }
     }
   }
-  else if (strcmp(msgParts[0], "getcal") == 0){
-    outputCalibration();
-  }
 }
 
 void setRTCTime(int y, int m, int d, int h, int mi, int s) {
   /*Set the current time of the RTC*/
   rtc.adjust(DateTime(y, m, d, h, mi, s));
-}
-
-void readCalibration() {
-  /*Read the calibration that is stored in the file*/
-  //Number of values read for each of the gasses
-  int ch4CalCount = 0;
-  int co2CalCount = 0;
-
-  //Reset the calibration stored in memory
-  for (int i = 0; i < 4; i++) {
-    ch4Calibration[i] = 0.0;
-    co2Calibration[i] = 0.0;
-  }
-
-  //If the methane calibration file exists
-  if (SD.exists("/ch4Calibration.txt")) {
-    //Open the file
-    File currentFile = SD.open("/ch4Calibration.txt", FILE_READ);
-    int line = 0;
-    linePosition = 0;
-    //For every character in the file
-    while (currentFile.available()) {
-      //Reach the character
-      char c = currentFile.read();
-      //If it is a new line
-      if (c == '\n') {
-        //If characters have not been read this line
-        if (linePosition == 0) {
-          //Set calibration value to 0.0
-          ch4Calibration[line] = 0.0;
-        } else {
-          //Add terminator character
-          fileLine[linePosition] = '\0';
-          //If the value is still within the calibration length
-          if (line < 4) {
-            //Convert to float
-            ch4Calibration[line] = atof(fileLine);
-            //Increment number of methane read
-            ch4CalCount = line + 1;
-          }
-        }
-        //Increment line and reset position
-        line = line + 1;
-        linePosition = 0;
-      } else {
-        //If it isn't a return or tab
-        if (c != '\t' && c != '\r') {
-          //If there is space for the character
-          if (linePosition < 99) {
-            //Add the character to the stored line
-            fileLine[linePosition] = c;
-            //Increment position
-            linePosition = linePosition + 1;
-          }
-        }
-      }
-    }
-    //Close the file
-    currentFile.close();
-  } else {
-    //Write blank methane calibration
-    writeCalibration(true);
-  }
-  //If the carbon dioxide calibration file exists
-  if (SD.exists("/co2Calibration.txt")) {
-    //Open the file
-    File currentFile = SD.open("/co2Calibration.txt", FILE_READ);
-    int line = 0;
-    linePosition = 0;
-    //Iterate for each character within the file
-    while (currentFile.available()) {
-      //Read the character
-      char c = currentFile.read();
-      //If the character is a new line
-      if (c == '\n') {
-        //If characters have not been read this line
-        if (linePosition == 0) {
-          //Set the calibration value to 0.0
-          ch4Calibration[line] = 0.0;
-        } else {
-          //Add the termination character
-          fileLine[linePosition] = '\0';
-          //If it is within calibration length
-          if (line < 4) {
-            //Convert to float
-            co2Calibration[line] = atof(fileLine);
-            //Increment carbon dioxide count
-            co2CalCount = line + 1;
-          }
-        }
-        //Increment line and reset position
-        line = line + 1;
-        linePosition = 0;
-      } else {
-        //If the character is not a tab or return
-        if (c != '\t' && c != '\r') {
-          //If there is still space in the line
-          if (linePosition < 99) {
-            //Add the character to the stored line
-            fileLine[linePosition] = c;
-            //Increment line position
-            linePosition = linePosition + 1;
-          }
-        }
-      }
-    }
-    //Close the file
-    currentFile.close();
-  } else {
-    //Write the blank carbon dioxide calibration
-    writeCalibration(false);
-  }
-
-  //If methane and carbon dioxide read at least 1 value
-  calibrated = ch4CalCount > 1 && co2CalCount > 1;
-}
-
-void writeCalibration(bool methane) {
-  /*Write the calibration for methane (true) or carbon dioxide (false) to the appropriate file*/
-  if (methane) {
-    //Open the methane file (clear and write)
-    File currentFile = SD.open("/ch4Calibration.txt", FILE_WRITE);
-    //Iterate through methane calibration
-    for (int i = 0; i < 4; i++) {
-      //Write the number as a line
-      currentFile.println(ch4Calibration[i], 4);
-    }
-    //Close the file
-    currentFile.close();
-  } else {
-    //Open the carbon dioxide file (clear and write)
-    File currentFile = SD.open("/co2Calibration.txt", FILE_WRITE);
-    //Iterate through carbon dioxide calibration
-    for (int i = 0; i < 4; i++) {
-      //Write the number as a line
-      currentFile.println(co2Calibration[i], 4);
-    }
-    //Close the file
-    currentFile.close();
-  }
 }
 
 void readTiming() {
@@ -1352,27 +1068,19 @@ void resetValues() {
 
 void readValues() {
   /*Read the values from the sensors*/
-  //Start converting carbon dioxide value
-  //int co2Value = analogRead(co2Pin);
-  adc.attach(co2Pin);
-  int co2Value = adc.readMiliVolts();
-  //Delay to allow A to D to process
-  delay(20);
-  //Start converting methane value
-  //int ch4Value = analogRead(ch4Pin);
-  adc.attach(ch4Pin);
-  int ch4Value = adc.readMiliVolts();
-  //Delay to allow A to D to process
-  delay(20);
+  //Start converting methane and carbon dioxide values
   float co2Level = gasSensor.sendCommand(0x02, 0x20);
   float ch4Level = gasSensor.sendCommand(0x01, 0x20);
+  //Delay to allow A to D to process
+  delay(1000);
+  
   USBSerial.write("Sensor Percentages: CH4:");
   USBSerial.print(ch4Level);
   USBSerial.write(" CO2:");
   USBSerial.println(co2Level);
   //Store value in averaging array
-  ch4ValueSet[setPosition] = ch4Value;
-  co2ValueSet[setPosition] = co2Value;
+  ch4ValueSet[setPosition] = ch4Level;
+  co2ValueSet[setPosition] = co2Level;
   //Increment store position
   setPosition = setPosition + 1;
   //If count has been reached for calculating the average
@@ -1466,14 +1174,6 @@ void calculateValues() {
 
 void writeData() {
   /*Write the current data point to the SD card and via serial*/
-  double actualCh4 = 0.0;
-  double actualCo2 = 0.0;
-  //Convert peak values to percentages using current calibration
-  actualCh4 = ch4Calibration[0] + (ch4Calibration[1] * (double)ch4Max) + (ch4Calibration[2] * (double)ch4Max * (double)ch4Max) + (ch4Calibration[3] * (double)ch4Max * (double)ch4Max * (double)ch4Max);
-  actualCo2 = co2Calibration[0] + (co2Calibration[1] * (double)co2Max) + (co2Calibration[2] * (double)co2Max * (double)co2Max) + (co2Calibration[3] * (double)co2Max * (double)co2Max * (double)co2Max);
-
-  //Calculate attempt at subtract and multiply normalisation
-  //double subtractModifier = ((actualCh4 + actualCo2) - 100) / 2.0;
   //If not flushing
   if(currentState != 3){
     //Get the current time
@@ -1491,9 +1191,9 @@ void writeData() {
     currentFile.print(',');
     currentFile.print(co2Max);
     currentFile.print(',');
-    currentFile.print(actualCh4, 3);
+    currentFile.print(ch4Max, 3);
     currentFile.print(',');
-    currentFile.println(actualCo2, 3);
+    currentFile.println(co2Max, 3);
     //currentFile.print(',');
     //currentFile.print(actualCh4 - subtractModifier);
     //currentFile.print(',');
@@ -1512,9 +1212,9 @@ void writeData() {
   Serial.print(' ');
   Serial.print(co2Max);
   Serial.print(' ');
-  Serial.print(actualCh4, 3);
+  Serial.print(ch4Max, 3);
   Serial.print(' ');
-  Serial.print(actualCo2, 3);
+  Serial.print(co2Max, 3);
   for (int i = 0; i < 5; i++) {
     USBSerial.print(' ');
     USBSerial.print(ch4ValuesPeak[i]);
@@ -1556,8 +1256,8 @@ void writeData() {
     Serial.write("All file writes done\n");
   }
   //Store integer versions for retrieval later
-  previousCh4Percent[currentValve] = floor(actualCh4);
-  previousCo2Percent[currentValve] = floor(actualCo2);
+  previousCh4Percent[currentValve] = floor(ch4Max);
+  previousCo2Percent[currentValve] = floor(co2Max);
 }
 
 int firstValve() {
@@ -1693,107 +1393,34 @@ void updateValves() {
   }
 }
 
+void outputSensors() {
+  USBSerial.write("1 CH4 2 CO2\n");
+}
+
+void performCalibration(uint8_t sensor, uint16_t amount) {
+  if (sensor > 0 && sensor <= numberSensors && amount >= 0 && amount <= 100){
+    USBSerial.write("");
+    openValve(flushValve);
+    delay(10000);
+    gasSensor.calibrateZero(sensor);
+    openValve(0);
+    USBSerial.write("");
+    delay(10000);
+    gasSensor.calibrateSpan(sensor, amount);
+    delay(5000);
+    USBSerial.write("");
+    closeValve(0);
+    openValve(flushValve);
+    delay(5000);
+    USBSerial.write("");
+  }
+}
+
 void sendCalibrationToSensor(bool methane) {
   if (methane){
     gasSensor.sendCommand(0x01, 0x00);//Not right but need command structure
   }else{
     gasSensor.sendCommand(0x02, 0x00);//Not right but need command structure
-  }
-}
-
-void resetCalibrationValues() {
-  /*Reset all the information about calibration logging*/
-  calCh4Max = 0;
-  calCo2Max = 0;
-  resetCalibrationAverages();
-}
-
-void resetCalibrationAverages() {
-  /*Reset the average data points for calibration*/
-  for (int i = 0; i < averageCount; i++) {
-    calCh4ValueSet[i] = 0;
-    calCo2ValueSet[i] = 0;
-  }
-  calSetPosition = 0;
-}
-
-void updateCalibrationRead() {
-  /*Update the sequence for the calibration being tested*/
-  //If not currently flushing
-  if (!flushingCalibration) {
-    //Take sensor readings
-    //int co2Value = analogRead(co2Pin);
-    adc.attach(co2Pin);
-    int co2Value = adc.readMiliVolts();
-    delay(20);
-    //int ch4Value = analogRead(ch4Pin);
-    adc.attach(ch4Pin);
-    int ch4Value = adc.readMiliVolts();
-    delay(20);
-
-    //Store in array to be averaged
-    calCh4ValueSet[calSetPosition] = ch4Value;
-    calCo2ValueSet[calSetPosition] = co2Value;
-
-    //Increment counter
-    calSetPosition = calSetPosition + 1;
-
-    //If array is full
-    if (calSetPosition >= averageCount) {
-      int ch4Total = 0;
-      int co2Total = 0;
-      //Sum values
-      for (int i = 0; i < averageCount; i++) {
-        ch4Total = ch4Total + calCh4ValueSet[i];
-        co2Total = co2Total + calCo2ValueSet[i];
-      }
-      //Divide by count to get average value
-      int ch4Average = floor(ch4Total / averageCount);
-      int co2Average = floor(co2Total / averageCount);
-
-      //If average values exceed maximum stored - update to new maximum
-      if (ch4Average > calCh4Max) {
-        calCh4Max = ch4Average;
-      }
-      if (co2Average > calCo2Max) {
-        calCo2Max = co2Average;
-      }
-
-      //Reset the averages
-      resetCalibrationAverages();
-    }
-
-    //If calibration time exceeded
-    if (timeDifference >= calWaitTime) {
-      //Close valve and open flush
-      closeValve(0);
-      openValve(15);
-      //Currently flushing, store start time
-      flushingCalibration = true;
-      lastAction = millis();
-    }
-  } else {
-    //If time for flushing exceeded
-    if (timeDifference >= calFlushDuration) {
-      //Close the flush valve
-      closeValve(15);
-      //Output the calibration point via serial
-      USBSerial.write("calpoint ");
-      //For methane
-      if (checkingCh4) {
-        USBSerial.write("ch4 ");
-        USBSerial.println(calCh4Max);
-      }
-      //For carbon dioxide
-      else if (checkingCo2) {
-        USBSerial.write("co2 ");
-        USBSerial.println(calCo2Max);
-      }
-      flushingCalibration = false;
-      readingCalibration = false;
-      //Reset all calibration memory
-      resetCalibrationValues();
-    }
   }
 }
 
@@ -1816,12 +1443,6 @@ void loop() {
     if (!calibrating) {
       //Update the valve sequence
       updateValves();
-    } else {
-      //If currently taking a calibration point
-      if (readingCalibration) {
-        //Update the calibration valve sequence
-        updateCalibrationRead();
-      }
     }
   }
   //Read incoming messages from serial
