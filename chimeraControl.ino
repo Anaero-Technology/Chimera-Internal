@@ -1076,6 +1076,7 @@ void resetValues() {
 void readValues() {
   /*Read the values from the sensors*/
   //Start converting methane and carbon dioxide values
+  delay(200);
   float co2Level = gasSensor.sendCommand(0x02, 0x20);
   float ch4Level = gasSensor.sendCommand(0x01, 0x20);
   //Delay to allow A to D to process
