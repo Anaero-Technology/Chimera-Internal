@@ -1076,16 +1076,15 @@ void resetValues() {
 void readValues() {
   /*Read the values from the sensors*/
   //Start converting methane and carbon dioxide values
-  delay(200);
   float co2Level = gasSensor.sendCommand(0x02, 0x20);
   float ch4Level = gasSensor.sendCommand(0x01, 0x20);
   //Delay to allow A to D to process
-  delay(1000);
+  delay(200);
   
-  USBSerial.write("Sensor Percentages: CH4:");
-  USBSerial.print(ch4Level);
-  USBSerial.write(" CO2:");
-  USBSerial.println(co2Level);
+  //USBSerial.write("Sensor Percentages: CH4:");
+  //USBSerial.print(ch4Level);
+  //USBSerial.write(" CO2:");
+  //USBSerial.println(co2Level);
   //If it is a valid value
   if (ch4Level >= 0.0) {
     //Store value in averaging array
@@ -1450,6 +1449,7 @@ void performCalibration(uint8_t sensor, uint16_t amount) {
       openValve(0);
       USBSerial.write("calibration opening\n");
       delay(10000);
+      USBSerial.write("calibration reading\n");
       gasSensor.calibrateSpan(sensor, amount);
       delay(5000);
       USBSerial.write("calibration finishing\n");
