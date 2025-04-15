@@ -48,6 +48,11 @@ unsigned long readInterval = 1000;
 //Time to flush after calibration gasses
 unsigned long calFlushDuration = 15000;
 
+unsigned long readWaitTime = 1000;
+bool readingSensors = false;
+float sensorValues[2] = {0.0, 0.0};
+unsigned long sensorReadStartTime = 0;
+
 //Array of booleans to determine which channels are currently being checked
 bool inService[15] = { true, true, true, true, true, true, true, true, true, true, true, true, true, true, true };
 
@@ -1073,20 +1078,27 @@ void resetValues() {
   setPositionCo2 = 0;
 }
 
-void readValues() {
+void startReadingValues() {
   /*Read the values from the sensors*/
   //Start converting methane and carbon dioxide values
-  float co2Level = gasSensor.sendCommand(0x02, 0x20);
-  float ch4Level = gasSensor.sendCommand(0x01, 0x20);
-  //Delay to allow A to D to process
-  delay(200);
-  
+  sensorValues[0] = gasSensor.sendCommand(0x01, 0x20);
+  sensorValues[1] = gasSensor.sendCommand(0x02, 0x20);
+  readingSensors = true;
+  sensorReadStartTime = millis();
+}
+
+void processSensorValues(){
+  float ch4Level = sensorValues[0];
+  float co2Level = sensorValues[1];
   //USBSerial.write("Sensor Percentages: CH4:");
   //USBSerial.print(ch4Level);
   //USBSerial.write(" CO2:");
   //USBSerial.println(co2Level);
   //If it is a valid value
   if (ch4Level >= 0.0) {
+    if (ch4Level > 90.0){
+      ch4Level = 90.0;
+    }
     //Store value in averaging array
     ch4ValueSet[setPositionCh4] = ch4Level;
     //Increment store position
@@ -1094,6 +1106,9 @@ void readValues() {
   }
   //If it is a valid value
   if (co2Level >= 0.0) {
+    if (co2Level > 80.0){
+      co2Level = 80.0;
+    }
     //Store value in averaging array
     co2ValueSet[setPositionCo2] = co2Level;
     //Increment store position
@@ -1112,6 +1127,12 @@ void readValues() {
     //Reset average counter position
     setPositionCo2 = 0;
   }
+  readingSensors = false;
+}
+
+void stopReadingValues(){
+  readingSensors = false;
+  //Cancel A to D if necessary or possible
 }
 
 void calculateValues(bool methane) {
@@ -1377,6 +1398,7 @@ void updateValves() {
   else if (currentState == 1) {
     //If time has elapsed
     if (timeDifference >= openDuration) {
+      stopReadingValues();
       //Close Valve
       closeValve(currentValve);
       //If currently setup
@@ -1401,8 +1423,19 @@ void updateValves() {
       //Move to pre flush state
       currentState = 2;
     } else {
-      //Read the current sensor values and perform average if enough have been tested
-      readValues();
+      if (!readingSensors){
+        //Read the current sensor values and perform average if enough have been tested
+        startReadingValues();
+      }else{
+        unsigned long current = millis();
+        unsigned long difference = current - sensorReadStartTime;
+        if (current < sensorReadStartTime){
+          difference = current + sensorReadStartTime - ULONGMAX;
+        }
+        if (difference >= readWaitTime){
+          processSensorValues();
+        }
+      }
     }
   }
   //If in pre flush state
@@ -1421,6 +1454,7 @@ void updateValves() {
   else if (currentState == 3) {
     //If time has elapsed
     if (timeDifference >= flushDuration) {
+      stopReadingValues();
       //Close Flush
       closeValve(flushValve);
       writeData();
@@ -1430,7 +1464,18 @@ void updateValves() {
       //Move to the pre valve open state
       currentState = 0;
     } else {
-      readValues();
+      if (!readingSensors){
+        startReadingValues();
+      }else{
+        unsigned long current = millis();
+        unsigned long difference = current - sensorReadStartTime;
+        if (current < sensorReadStartTime){
+          difference = current + sensorReadStartTime - ULONGMAX;
+        }
+        if (difference >= readWaitTime){
+          processSensorValues();
+        }
+      }
     }
   }
 }
@@ -1451,11 +1496,11 @@ void performCalibration(uint8_t sensor, uint16_t amount) {
       delay(10000);
       USBSerial.write("calibration reading\n");
       gasSensor.calibrateSpan(sensor, amount);
-      delay(5000);
+      delay(10000);
       USBSerial.write("calibration finishing\n");
       closeValve(0);
       openValve(flushValve);
-      delay(5000);
+      delay(10000);
       USBSerial.write("done calibration\n");
     }else{
       USBSerial.write("failed calibration invalidpercent\n");
