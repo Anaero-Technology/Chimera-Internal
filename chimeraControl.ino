@@ -1247,12 +1247,12 @@ void writeData() {
     currentFile.seek(currentFile.size());
     //Add the time, valve number, maximum CH4, maximum CO2, percentage CH4, percentage CO2 and normalised versions
     currentFile.print(timeStamp);
-    currentFile.print(',');
-    currentFile.print(currentValve + 1);
-    currentFile.print(',');
-    currentFile.print(ch4Max);
-    currentFile.print(',');
-    currentFile.print(co2Max);
+    //currentFile.print(',');
+    //currentFile.print(currentValve + 1);
+    //currentFile.print(',');
+    //currentFile.print(ch4Max);
+    //currentFile.print(',');
+    //currentFile.print(co2Max);
     currentFile.print(',');
     currentFile.print(ch4Max, 3);
     currentFile.print(',');
@@ -1270,10 +1270,10 @@ void writeData() {
   }else{
     USBSerial.print("15");
   }
-  Serial.print(' ');
-  Serial.print(ch4Max);
-  Serial.print(' ');
-  Serial.print(co2Max);
+  //Serial.print(' ');
+  //Serial.print(ch4Max);
+  //Serial.print(' ');
+  //Serial.print(co2Max);
   Serial.print(' ');
   Serial.print(ch4Max, 3);
   Serial.print(' ');
@@ -1303,7 +1303,7 @@ void writeData() {
       extraFile.print(ch4ValuesPeak[i]);
     }
     extraFile.print(",");
-    extraFile.println(ch4Max);
+    extraFile.println(ch4Max, 3);
     //Write the time, valve and each of the peak values
     extraFile.print(timeStamp);
     extraFile.print(',');
@@ -1314,7 +1314,7 @@ void writeData() {
       extraFile.print(co2ValuesPeak[i]);
     }
     extraFile.print(",");
-    extraFile.println(co2Max);
+    extraFile.println(co2Max, 3);
     extraFile.close();
     Serial.write("All file writes done\n");
   }
