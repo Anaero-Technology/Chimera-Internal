@@ -1247,8 +1247,8 @@ void writeData() {
     currentFile.seek(currentFile.size());
     //Add the time, valve number, maximum CH4, maximum CO2, percentage CH4, percentage CO2 and normalised versions
     currentFile.print(timeStamp);
-    //currentFile.print(',');
-    //currentFile.print(currentValve + 1);
+    currentFile.print(',');
+    currentFile.print(currentValve + 1);
     //currentFile.print(',');
     //currentFile.print(ch4Max);
     //currentFile.print(',');
@@ -1489,18 +1489,18 @@ void performCalibration(uint8_t sensor, uint16_t amount) {
     if(amount >= 0 && amount <= 100){
       USBSerial.write("calibration starting\n");
       openValve(flushValve);
-      delay(10000);
+      delay(30000);
       gasSensor.calibrateZero(sensor);
       openValve(0);
       USBSerial.write("calibration opening\n");
-      delay(10000);
+      delay(30000);
       USBSerial.write("calibration reading\n");
       gasSensor.calibrateSpan(sensor, amount);
-      delay(10000);
+      delay(120000);
       USBSerial.write("calibration finishing\n");
       closeValve(0);
       openValve(flushValve);
-      delay(10000);
+      delay(30000);
       USBSerial.write("done calibration\n");
     }else{
       USBSerial.write("failed calibration invalidpercent\n");
