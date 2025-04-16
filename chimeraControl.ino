@@ -1090,10 +1090,10 @@ void startReadingValues() {
 void processSensorValues(){
   float ch4Level = sensorValues[0];
   float co2Level = sensorValues[1];
-  //USBSerial.write("Sensor Percentages: CH4:");
-  //USBSerial.print(ch4Level);
-  //USBSerial.write(" CO2:");
-  //USBSerial.println(co2Level);
+  USBSerial.write("Sensor Percentages: CH4: ");
+  USBSerial.print(ch4Level);
+  USBSerial.write(" CO2: ");
+  USBSerial.println(co2Level);
   //If it is a valid value
   if (ch4Level >= 0.0) {
     if (ch4Level > 90.0){
