@@ -1249,14 +1249,10 @@ void writeData() {
     currentFile.print(timeStamp);
     currentFile.print(',');
     currentFile.print(currentValve + 1);
-    //currentFile.print(',');
-    //currentFile.print(ch4Max);
-    //currentFile.print(',');
-    //currentFile.print(co2Max);
     currentFile.print(',');
-    currentFile.print(ch4Max, 3);
+    currentFile.print(ch4Max);
     currentFile.print(',');
-    currentFile.println(co2Max, 3);
+    currentFile.print(co2Max);
     //currentFile.print(',');
     //currentFile.print(actualCh4 - subtractModifier);
     //currentFile.print(',');
@@ -1270,14 +1266,10 @@ void writeData() {
   }else{
     USBSerial.print("15");
   }
-  //Serial.print(' ');
-  //Serial.print(ch4Max);
-  //Serial.print(' ');
-  //Serial.print(co2Max);
   Serial.print(' ');
-  Serial.print(ch4Max, 3);
+  Serial.print(ch4Max);
   Serial.print(' ');
-  Serial.print(co2Max, 3);
+  Serial.print(co2Max);
   for (int i = 0; i < 5; i++) {
     USBSerial.print(' ');
     USBSerial.print(ch4ValuesPeak[i]);
