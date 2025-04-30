@@ -1481,24 +1481,40 @@ void performCalibration(uint8_t sensor, uint16_t amount) {
     if(amount >= 0 && amount <= 100){
       USBSerial.write("calibration starting\n");
       openValve(flushValve);
-      delay(30000);
+      delay(20000);
       gasSensor.calibrateZero(sensor);
+      closeValve(flushValve);
       openValve(0);
       USBSerial.write("calibration opening\n");
-      delay(30000);
+      delaySensorRead(sensor);
       USBSerial.write("calibration reading\n");
       gasSensor.calibrateSpan(sensor, amount);
-      delay(120000);
+      delay(10000);
       USBSerial.write("calibration finishing\n");
       closeValve(0);
       openValve(flushValve);
-      delay(30000);
+      delay(20000);
+      closeValve(flushValve);
       USBSerial.write("done calibration\n");
     }else{
       USBSerial.write("failed calibration invalidpercent\n");
     }
   }else{
     USBSerial.write("failed calibration invalidsensor\n");
+  }
+}
+
+void delaySensorRead(uint8_t sensor) {
+  int numberReads = 20;
+  unsigned long waitTime = 120000U;
+  unsigned long numberReadsUL = numberReads;
+  unsigned long waitBetween = (waitTime / numberReadsUL) - readWaitTime;
+  for (int i = 0; i < numberReads; i++){
+    delay(waitBetween);
+    float sensorValue = gasSensor.sendCommand(sensor, 0x20);
+    delay(readWaitTime);
+    USBSerial.write("calibration info ");
+    USBSerial.println(sensorValue, 2);
   }
 }
 
