@@ -1090,9 +1090,9 @@ void startReadingValues() {
 void processSensorValues(){
   float ch4Level = sensorValues[0];
   float co2Level = sensorValues[1];
-  USBSerial.write("Sensor Percentages: CH4: ");
+  USBSerial.write("CH4:");
   USBSerial.print(ch4Level);
-  USBSerial.write(" CO2: ");
+  USBSerial.write(" CO2:");
   USBSerial.println(co2Level);
   //If it is a valid value
   if (ch4Level >= 0.0) {
@@ -1249,10 +1249,14 @@ void writeData() {
     currentFile.print(timeStamp);
     currentFile.print(',');
     currentFile.print(currentValve + 1);
+    //currentFile.print(',');
+    //currentFile.print(ch4Max);
+    //currentFile.print(',');
+    //currentFile.print(co2Max);
     currentFile.print(',');
-    currentFile.print(ch4Max);
+    currentFile.print(ch4ValuesPeak[0]);
     currentFile.print(',');
-    currentFile.print(co2Max);
+    currentFile.println(co2ValuesPeak[0]);
     //currentFile.print(',');
     //currentFile.print(actualCh4 - subtractModifier);
     //currentFile.print(',');
@@ -1266,10 +1270,14 @@ void writeData() {
   }else{
     USBSerial.print("15");
   }
+  //Serial.print(' ');
+  //Serial.print(ch4Max);
+  //Serial.print(' ');
+  //Serial.print(co2Max);
   Serial.print(' ');
-  Serial.print(ch4Max);
+  Serial.print(ch4ValuesPeak[0]);
   Serial.print(' ');
-  Serial.print(co2Max);
+  Serial.print(co2ValuesPeak[0]);
   for (int i = 0; i < 5; i++) {
     USBSerial.print(' ');
     USBSerial.print(ch4ValuesPeak[i]);
