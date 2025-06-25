@@ -724,6 +724,9 @@ void processMessage() {
         if (calibrationPercentage >= 0 && calibrationPercentage <= 100){
           uint8_t targetSensor = sensorNumber;
           uint16_t targetPercentage = calibrationPercentage;
+          USBSerial.write("Given Calibration Percentage: ");
+          USBSerial.print(targetPercentage);
+          USBSerial.write("\n");
           performCalibration(targetSensor, targetPercentage);
         }else{
           USBSerial.write("failed point invalidpercentage\n");
@@ -1249,14 +1252,14 @@ void writeData() {
     currentFile.print(timeStamp);
     currentFile.print(',');
     currentFile.print(currentValve + 1);
-    //currentFile.print(',');
-    //currentFile.print(ch4Max);
-    //currentFile.print(',');
-    //currentFile.print(co2Max);
     currentFile.print(',');
-    currentFile.print(ch4ValuesPeak[0]);
+    currentFile.print(ch4Max);
     currentFile.print(',');
-    currentFile.println(co2ValuesPeak[0]);
+    currentFile.println(co2Max);
+    //currentFile.print(',');
+    //currentFile.print(ch4ValuesPeak[0]);
+    //currentFile.print(',');
+    //currentFile.println(co2ValuesPeak[0]);
     //currentFile.print(',');
     //currentFile.print(actualCh4 - subtractModifier);
     //currentFile.print(',');
@@ -1270,14 +1273,14 @@ void writeData() {
   }else{
     USBSerial.print("15");
   }
-  //Serial.print(' ');
-  //Serial.print(ch4Max);
-  //Serial.print(' ');
-  //Serial.print(co2Max);
   Serial.print(' ');
-  Serial.print(ch4ValuesPeak[0]);
+  Serial.print(ch4Max);
   Serial.print(' ');
-  Serial.print(co2ValuesPeak[0]);
+  Serial.print(co2Max);
+  //Serial.print(' ');
+  //Serial.print(ch4ValuesPeak[0]);
+  //Serial.print(' ');
+  //Serial.print(co2ValuesPeak[0]);
   for (int i = 0; i < 5; i++) {
     USBSerial.print(' ');
     USBSerial.print(ch4ValuesPeak[i]);
