@@ -1499,7 +1499,7 @@ void performCalibration(uint8_t sensor, uint16_t amount) {
       USBSerial.write("calibration opening\n");
       delaySensorRead(sensor);
       USBSerial.write("calibration reading\n");
-      gasSensor.calibrateSpan(sensor, amount);
+      gasSensor.calibrateSpan(sensor, amount * 10);
       delay(10000);
       USBSerial.write("calibration finishing\n");
       closeValve(0);
